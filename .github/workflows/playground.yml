@@ -1,0 +1,120 @@
+name: Playground Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  issues: ~
+  workflow_dispatch:
+    inputs:
+      who:
+        description: 'Who to greet'
+        required: true
+        default: 'World'
+
+env:
+  DEFAULT_GREET: robots # Default value when the workflow is not trigger by a human
+
+jobs:
+  input-output:
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    name: 'Input/Output Playground'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Greet
+        id: greet
+        uses: ./.github/actions/greet
+        with:
+          who-to-greet: ${{ github.event.inputs.who || env.DEFAULT_GREET }}
+
+      - name: Get some random number from previous step
+        run: echo random-number ${{ steps.greet.outputs.random-number }}
+
+      - name: Set selected color
+        run: echo '::set-output name=select-color::green'
+        id: random-color-generator
+
+      - name: Get color
+        run: echo "The selected color is ${{ steps.random-color-generator.outputs.select-color }}"
+
+      - name: Debug global variables
+        run: |
+          echo "::group::unix env"
+          env | sort
+          echo "::endgroup::"
+          echo "::group::github"
+          echo '${{ toJson(github) }}'
+          echo "::endgroup::"
+          echo "::group::env"
+          echo '${{ toJson(env) }}'
+          echo "::endgroup::"
+          echo "::group::job"
+          echo '${{ toJson(job) }}'
+          echo "::endgroup::"
+          echo "::group::steps"
+          echo '${{ toJson(steps) }}'
+          echo "::endgroup::"
+          echo "::group::strategy"
+          echo '${{ toJson(strategy) }}'
+          echo "::endgroup::"
+          echo "::group::matrix"
+          echo '${{ toJson(matrix) }}'
+          echo "::endgroup::"
+          echo "::group::needs"
+          echo '${{ toJson(needs) }}'
+          echo "::endgroup::"
+          echo "::group::inputs"
+          echo '${{ toJson(inputs) }}'
+          echo "::endgroup::"
+          echo '${{ secrets.MY_SECRET }}'
+
+
+      - name: Logs
+        run: |
+          echo '::debug::My debug message'
+          echo '::notice::My notice message'
+          echo '::warning::My warning message'
+          echo '::error::My error message'
+
+      - name: Write a summary
+        run: echo "### Hello world! :rocket:" >> $GITHUB_STEP_SUMMARY
+
+  services:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: 'Services Playground'
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+    steps:
+      - name: install redis-cli
+        run: |
+           sudo apt install redis-tools -y
+
+      - name: 'Set redis-key'
+        run: |
+          redis-cli set my-key "Hello world!"
+
+      - name: 'Get redis-key'
+        run: |
+          redis-cli get my-key
+
+  greeting:
+    if: github.event_name == 'pull_request' || github.event_name == 'issues'
+    name: Greeting
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+    - uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        issue-message: "Hello there, thanks for your first issue!"
+        pr-message: "Hello there, thanks for your first pull request!"
